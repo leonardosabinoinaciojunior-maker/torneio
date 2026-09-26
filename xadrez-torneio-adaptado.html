@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torneio de Xadrez</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg-main: #161c18;
+            --panel: #1f2621;
+            --panel-alt: #262f28;
+            --border: #374038;
+            --board-light: #ece3cf;
+            --board-dark: #5b7355;
+            --accent: #c39a4d;
+            --text-main: #eae5d8;
+            --text-secondary: #a3ab9f;
+            --danger: #b5533f;
+            --success: #6f9a5b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-main); color: var(--text-main); min-height: 100vh; padding: 1rem; }
+        h1, h2, h3 { font-family: 'Fraunces', serif; font-weight: 600; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .login-box { background: var(--panel); padding: 2rem; border-radius: 10px; border: 1px solid var(--border); width: 100%; max-width: 350px; }
+        .login-box h1 { text-align: center; margin-bottom: 2rem; font-size: 1.8rem; }
+        .login-tabs { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+        .login-tab { flex: 1; padding: 0.75rem; background: none; border: none; color: var(--text-secondary); cursor: pointer; font-family: 'Inter', sans-serif; border-bottom: 2px solid transparent; transition: all 0.3s; }
+        .login-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+        .login-form { display: none; }
+        .login-form.active { display: block; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-size: 0.9rem; color: var(--text-secondary); }
+        .form-group input { width: 100%; padding: 0.75rem; background: var(--panel-alt); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); font-family: 'Inter', sans-serif; }
+        .form-group input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(195, 154, 77, 0.1); }
+        button { background: var(--accent); color: var(--bg-main); border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-family: 'Inter', sans-serif; font-weight: 600; transition: all 0.3s; }
+        button:hover { opacity: 0.9; transform: translateY(-2px); }
+        .btn-primary { width: 100%; margin-top: 1rem; }
+        .btn-danger { background: var(--danger); }
+        .btn-success { background: var(--success); }
+        .btn-secondary { background: var(--panel-alt); color: var(--text-main); border: 1px solid var(--border); }
+        .btn-small { padding: 0.4rem 0.75rem; font-size: 0.8rem; }
+        .dashboard { display: none; }
+        .dashboard.active { display: block; }
+        .dashboard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+        .dashboard-header h1 { font-size: 2rem; }
+        .user-info { font-size: 0.9rem; color: var(--text-secondary); }
+        .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; }
+        .panel h2 { margin-bottom: 1rem; font-size: 1.2rem; color: var(--accent); }
+        .player-form { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .player-form input { flex: 1; min-width: 100px; }
+        .player-form button { padding: 0.75rem 1rem; }
+        .players-list { background: var(--panel-alt); border-radius: 6px; padding: 1rem; max-height: 300px; overflow-y: auto; }
+        .player-item { padding: 0.75rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; gap: 8px; }
+        .player-item:last-child { border-bottom: none; }
+        .player-credentials { font-family: 'Courier New', monospace; color: var(--accent); }
+        .matchups-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 1rem; }
+        .matchups-table th { background: var(--panel-alt); padding: 0.75rem; text-align: left; color: var(--accent); border-bottom: 1px solid var(--border); }
+        .matchups-table td { padding: 0.75rem; border-bottom: 1px solid var(--border); }
+        .matchup-status { padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.8rem; font-weight: 500; }
+        .matchup-status.ongoing { background: var(--panel-alt); color: var(--accent); }
+        .matchup-status.completed { background: var(--success); color: var(--bg-main); }
+        .player-board { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem; }
+        @media (max-width: 900px) { .player-board { grid-template-columns: 1fr; } }
+        .match-info { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+        .match-adversary { text-align: center; padding: 1rem; background: var(--panel-alt); border-radius: 6px; }
+        .match-adversary .label { font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; }
+        .match-adversary .name { font-size: 1.5rem; font-weight: 600; color: var(--accent); margin-top: 0.25rem; }
+        .match-score { text-align: center; padding: 1rem; background: var(--panel-alt); border-radius: 6px; }
+        .match-score .label { font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem; }
+        .score-display { font-size: 2rem; color: var(--accent); font-weight: 600; }
+        .games-result { display: flex; gap: 0.5rem; justify-content: center; margin-top: 0.75rem; }
+        .game-chip { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; border: 2px solid var(--border); }
+        .game-chip.win { background: var(--success); color: var(--bg-main); border-color: var(--success); }
+        .game-chip.loss { background: var(--danger); color: var(--bg-main); border-color: var(--danger); }
+        .game-chip.draw, .game-chip.pending { background: var(--panel-alt); color: var(--text-secondary); }
+        .action-buttons { display: flex; gap: 0.5rem; margin-top: 1rem; }
+        .action-buttons button { flex: 1; }
+        .chessboard { display: inline-block; border: 2px solid var(--accent); border-radius: 4px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
+        .chessboard-row { display: flex; }
+        .square { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; font-size: 2rem; cursor: pointer; user-select: none; transition: all 0.2s; position: relative; }
+        @media (max-width: 600px) { .square { width: 40px; height: 40px; font-size: 1.5rem; } }
+        .square.light { background: var(--board-light); }
+        .square.dark { background: var(--board-dark); }
+        .square.selected { box-shadow: inset 0 0 0 3px var(--accent); }
+        .square img { width: 86%; height: 86%; object-fit: contain; pointer-events: none; user-select: none; display: block; }
+        .square.legal-move::after { content: ''; position: absolute; width: 12px; height: 12px; background: rgba(30,30,30,0.45); border-radius: 50%; pointer-events: none; }
+        .square.legal-capture::after { content: ''; position: absolute; width: 70%; height: 70%; border: 3px solid rgba(181,83,63,0.85); border-radius: 50%; pointer-events: none; }
+        .square.last-move { box-shadow: inset 0 0 0 3px rgba(195,154,77,0.55); }
+        .square.check { background: rgba(181,83,63,0.8) !important; }
+        .clocks { display: flex; gap: 1rem; margin-bottom: 1rem; }
+        .clock { flex: 1; background: var(--panel-alt); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; text-align: center; }
+        .clock-player { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
+        .clock-time { font-family: 'Courier New', monospace; font-size: 1.8rem; font-weight: 600; color: var(--accent); }
+        .clock.active { border-color: var(--success); background: rgba(111,154,91,0.1); }
+        .clock.warning, .clock.warning .clock-time { color: var(--danger); }
+        .move-history { background: var(--panel-alt); border-radius: 6px; padding: 1rem; max-height: 300px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 0.85rem; }
+        .move-pair { display: grid; grid-template-columns: 30px 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+        .move-number { color: var(--text-secondary); }
+        .move { padding: 0.25rem 0.5rem; background: var(--panel); border-radius: 3px; }
+        .rankings-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        .rankings-table th { background: var(--panel-alt); padding: 0.75rem; text-align: left; color: var(--accent); border-bottom: 1px solid var(--border); }
+        .rankings-table td { padding: 0.75rem; border-bottom: 1px solid var(--border); }
+        .rank { font-weight: 600; color: var(--accent); }
+        .message { padding: 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem; }
+        .message.info, .message.warning { background: rgba(195,154,77,0.1); color: var(--accent); }
+        .message.success { background: rgba(111,154,91,0.1); color: var(--success); }
+        .message.error { background: rgba(181,83,63,0.1); color: var(--danger); }
+        .online-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--success); margin-right: 6px; }
+        .badge-super { background: var(--accent); color: var(--bg-main); padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px; }
+        @media (max-width: 768px) { .admin-grid { grid-template-columns: 1fr; } .dashboard-header { flex-direction: column; align-items: flex-start; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="loginScreen" class="login-screen">
+            <div class="login-box">
+                <h1>♔ Xadrez</h1>
+                <div class="login-tabs">
+                    <button class="login-tab active" data-tab="player">Jogador</button>
+                    <button class="login-tab" data-tab="admin">Admin</button>
+                </div>
+                <form id="playerLoginForm" class="login-form active">
+                    <div class="form-group"><label>Username</label><input type="text" id="playerUsername" placeholder="jogador01" required></div>
+                    <div class="form-group"><label>Senha</label><input type="password" id="playerPassword" placeholder="••••••" required></div>
+                    <button type="submit" class="btn-primary">Entrar</button>
+                </form>
+                <form id="adminLoginForm" class="login-form">
+                    <div class="form-group"><label>Username Admin</label><input type="text" id="adminUsername" placeholder="admin" required></div>
+                    <div class="form-group"><label>Senha</label><input type="password" id="adminPassword" placeholder="••••••" required></div>
+                    <button type="submit" class="btn-primary">Entrar</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="adminDashboard" class="dashboard">
+            <div class="dashboard-header">
+                <div><h1>Painel do Administrador</h1></div>
+                <div class="user-info"><p>Logado como: <strong id="adminNameLabel">Admin</strong></p><button id="adminLogout" class="btn-secondary">Sair</button></div>
+            </div>
+            <div id="adminMessage"></div>
+            <div class="admin-grid">
+                <div class="panel">
+                    <h2>Cadastrar Jogadores</h2>
+                    <div class="player-form">
+                        <input type="text" id="playerName" placeholder="Nome do jogador" required>
+                        <input type="text" id="playerNickname" placeholder="Apelido (opcional)">
+                        <button id="addPlayerBtn">Adicionar</button>
+                    </div>
+                    <div class="players-list" id="playersList"></div>
+                </div>
+                <div class="panel">
+                    <h2>Configuração</h2>
+                    <div class="form-group"><label>Duração da partida (minutos)</label><input type="number" id="timePerGame" value="15" min="1" max="120"></div>
+                    <button id="updateTimeBtn" class="btn-primary">Atualizar tempo</button>
+                    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);"><button id="randomizeMatchupsBtn" class="btn-primary btn-success">Sortear Confrontos</button></div>
+                    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);"><button id="restartTournamentBtn" class="btn-primary btn-danger">Reiniciar Torneio</button></div>
+                </div>
+                <div class="panel">
+                    <h2>Ranking</h2>
+                    <table class="rankings-table"><thead><tr><th>#</th><th>Jogador</th><th>Pontos</th></tr></thead><tbody id="rankingsBody"></tbody></table>
+                </div>
+                <div class="panel" id="adminManagementPanel" style="display:none;">
+                    <h2>Administradores</h2>
+                    <div class="player-form">
+                        <input type="text" id="newAdminUsername" placeholder="username">
+                        <input type="text" id="newAdminPassword" placeholder="senha (vazio = gerar)">
+                        <button id="addAdminBtn">Adicionar</button>
+                    </div>
+                    <div class="players-list" id="adminsList"></div>
+                </div>
+                <div class="panel" id="onlineUsersPanel" style="display:none;">
+                    <h2>Usuários Online</h2>
+                    <div class="players-list" id="onlineList"></div>
+                </div>
+            </div>
+            <div class="panel">
+                <h2>Confrontos</h2>
+                <table class="matchups-table"><thead><tr><th>Branco</th><th>Preto</th><th>Placar</th><th>Status</th></tr></thead><tbody id="matchupsBody"></tbody></table>
+            </div>
+        </div>
+
+        <div id="playerDashboard" class="dashboard">
+            <div class="dashboard-header">
+                <div><h1>Torneio de Xadrez</h1></div>
+                <div class="user-info"><p>Jogador: <strong id="currentPlayerName"></strong></p><button id="playerLogout" class="btn-secondary">Sair</button></div>
+            </div>
+            <div id="playerMessage"></div>
+            <div id="gameContainer" style="display:none;">
+                <div class="player-board">
+                    <div>
+                        <div class="match-info">
+                            <div class="match-adversary"><div class="label">Adversário</div><div class="name" id="adversaryName">-</div></div>
+                            <div class="match-score">
+                                <div class="label">Placar do Confronto</div>
+                                <div class="score-display" id="matchScore">0 - 0</div>
+                                <div class="label" style="margin-top:0.75rem;">Resultado dos Jogos</div>
+                                <div class="games-result" id="gamesResult"></div>
+                            </div>
+                            <div style="padding:1rem;background:var(--panel-alt);border-radius:6px;"><div class="label">Partida Atual</div><div class="name" id="currentGameInfo" style="font-size:1rem;margin-top:0.5rem;">-</div></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="match-info">
+                            <div class="clocks" id="clocksContainer"></div>
+                            <div><h3 style="margin-bottom:0.75rem;">Histórico de Lances</h3><div class="move-history" id="moveHistory">Nenhum lance ainda</div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel">
+                    <div style="text-align:center;margin-bottom:1.5rem;"><h3 style="margin-bottom:1rem;">Tabuleiro</h3><div class="chessboard" id="chessboard"></div></div>
+                    <div class="clocks" id="boardClocks"></div>
+                    <div class="action-buttons"><button id="drawOfferBtn" class="btn-secondary">Oferecer Empate</button><button id="resignBtn" class="btn-danger">Desistir</button></div>
+                </div>
+            </div>
+            <div id="noMatchDiv" style="padding:2rem;text-align:center;">
+                <p style="color:var(--text-secondary);margin-bottom:1rem;">Nenhuma partida disponível no momento.</p>
+                <button id="refreshBtn" class="btn-secondary">Atualizar</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+/* =================== SUPABASE =================== */
+const SUPABASE_URL = 'https://SEU-PROJETO.supabase.co';
+const SUPABASE_ANON_KEY = 'SUA_CHAVE_ANON_AQUI';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const PIECE_IMAGES = {
+    '♔': 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg',
+    '♕': 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg',
+    '♖': 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg',
+    '♗': 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg',
+    '♘': 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg',
+    '♙': 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg',
+    '♚': 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg',
+    '♛': 'https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg',
+    '♜': 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg',
+    '♝': 'https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg',
+    '♞': 'https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg',
+    '♟': 'https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg'
+};
+
+/* ============================================================
+   ENGINE DE XADREZ (inalterada — sua lógica original)
+   ============================================================ */
+class ChessBoard {
+    constructor(gameId, currentPlayerId, matchup) {
+        this.gameId = gameId;
+        const gameData = matchup.games.find(g => g.id === gameId);
+        if (!gameData) throw new Error('Partida não encontrada.');
+        this.whitePlayerId = gameData.whitePlayerId;
+        this.blackPlayerId = this.whitePlayerId === matchup.player1 ? matchup.player2 : matchup.player1;
+        this.currentPlayer = this.whitePlayerId;
+        this.board = this.initializeBoard();
+        this.moveHistory = [];
+        this.gameOver = false;
+        this.castlingRights = { white: { kingSide: true, queenSide: true }, black: { kingSide: true, queenSide: true } };
+        this.enPassantTarget = null;
+        this.lastMove = null;
+        this.whiteTimeRemaining = 0;
+        this.blackTimeRemaining = 0;
+    }
+    initializeBoard() {
+        return [
+            ['♜','♞','♝','♛','♚','♝','♞','♜'],
+            ['♟','♟','♟','♟','♟','♟','♟','♟'],
+            [null,null,null,null,null,null,null,null],
+            [null,null,null,null,null,null,null,null],
+            [null,null,null,null,null,null,null,null],
+            [null,null,null,null,null,null,null,null],
+            ['♙','♙','♙','♙','♙','♙','♙','♙'],
+            ['♖','♘','♗','♕','♔','♗','♘','♖']
+        ];
+    }
+    isInside(row, col) { return row >= 0 && row < 8 && col >= 0 && col < 8; }
+    getPiece(row, col) { if (!this.isInside(row, col)) return null; return this.board[row][col]; }
+    getPieceColor(piece) { if (!piece) return null; return ['♔','♕','♖','♗','♘','♙'].includes(piece) ? 'white' : 'black'; }
+    getPlayerColor(playerId) { if (playerId === this.whitePlayerId) return 'white'; if (playerId === this.blackPlayerId) return 'black'; return null; }
+    getOpponentColor(color) { return color === 'white' ? 'black' : 'white'; }
+    getLegalMoves(row, col) {
+        const piece = this.getPiece(row, col);
+        if (!piece) return [];
+        const color = this.getPieceColor(piece);
+        const expectedPlayer = color === 'white' ? this.whitePlayerId : this.blackPlayerId;
+        if (expectedPlayer !== this.currentPlayer) return [];
+        return this.getPseudoLegalMoves(row, col).filter(move => !this.wouldLeaveKingInCheck(row, col, move.row, move.col));
+    }
+    getAllLegalMoves(color) {
+        const moves = [];
+        for (let row = 0; row < 8; row++) for (let col = 0; col < 8; col++) {
+            const piece = this.getPiece(row, col);
+            if (!piece || this.getPieceColor(piece) !== color) continue;
+            this.getPseudoLegalMoves(row, col).forEach(move => {
+                if (!this.wouldLeaveKingInCheck(row, col, move.row, move.col)) moves.push({ fromRow: row, fromCol: col, toRow: move.row, toCol: move.col });
+            });
+        }
+        return moves;
+    }
+    getPseudoLegalMoves(row, col) {
+        const piece = this.getPiece(row, col);
+        if (!piece) return [];
+        const color = this.getPieceColor(piece);
+        switch (piece) {
+            case '♔': case '♚': return this.getKingMoves(row, col, color);
+            case '♕': case '♛': return this.getQueenMoves(row, col, color);
+            case '♖': case '♜': return this.getRookMoves(row, col, color);
+            case '♗': case '♝': return this.getBishopMoves(row, col, color);
+            case '♘': case '♞': return this.getKnightMoves(row, col, color);
+            case '♙': case '♟': return this.getPawnMoves(row, col, color);
+            default: return [];
+        }
+    }
+    getKingMoves(row, col, color) {
+        const moves = [];
+        const directions = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+        directions.forEach(([dr, dc]) => {
+            const newRow = row + dr, newCol = col + dc;
+            if (!this.isInside(newRow, newCol)) return;
+            const target = this.getPiece(newRow, newCol);
+            if (!target || this.getPieceColor(target) !== color) moves.push({ row: newRow, col: newCol });
+        });
+        const enemy = this.getOpponentColor(color);
+        if (color === 'white' && row === 7 && col === 4) {
+            if (this.castlingRights.white.kingSide && this.getPiece(7,5) === null && this.getPiece(7,6) === null && this.getPiece(7,7) === '♖' &&
+                !this.isSquareAttacked(7,4,enemy) && !this.isSquareAttacked(7,5,enemy) && !this.isSquareAttacked(7,6,enemy))
+                moves.push({ row: 7, col: 6, castle: 'kingSide' });
+            if (this.castlingRights.white.queenSide && this.getPiece(7,3) === null && this.getPiece(7,2) === null && this.getPiece(7,1) === null && this.getPiece(7,0) === '♖' &&
+                !this.isSquareAttacked(7,4,enemy) && !this.isSquareAttacked(7,3,enemy) && !this.isSquareAttacked(7,2,enemy))
+                moves.push({ row: 7, col: 2, castle: 'queenSide' });
+        }
+        if (color === 'black' && row === 0 && col === 4) {
+            if (this.castlingRights.black.kingSide && this.getPiece(0,5) === null && this.getPiece(0,6) === null && this.getPiece(0,7) === '♜' &&
+                !this.isSquareAttacked(0,4,enemy) && !this.isSquareAttacked(0,5,enemy) && !this.isSquareAttacked(0,6,enemy))
+                moves.push({ row: 0, col: 6, castle: 'kingSide' });
+            if (this.castlingRights.black.queenSide && this.getPiece(0,3) === null && this.getPiece(0,2) === null && this.getPiece(0,1) === null && this.getPiece(0,0) === '♜' &&
+                !this.isSquareAttacked(0,4,enemy) && !this.isSquareAttacked(0,3,enemy) && !this.isSquareAttacked(0,2,enemy))
+                moves.push({ row: 0, col: 2, castle: 'queenSide' });
+        }
+        return moves;
+    }
+    getRookMoves(row, col, color) { return this.getSlidingMoves(row, col, color, [[-1,0],[1,0],[0,-1],[0,1]]); }
+    getBishopMoves(row, col, color) { return this.getSlidingMoves(row, col, color, [[-1,-1],[-1,1],[1,-1],[1,1]]); }
+    getQueenMoves(row, col, color) { return this.getSlidingMoves(row, col, color, [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]); }
+    getSlidingMoves(row, col, color, directions) {
+        const moves = [];
+        directions.forEach(([dr, dc]) => {
+            let newRow = row + dr, newCol = col + dc;
+            while (this.isInside(newRow, newCol)) {
+                const target = this.getPiece(newRow, newCol);
+                if (!target) moves.push({ row: newRow, col: newCol });
+                else { if (this.getPieceColor(target) !== color) moves.push({ row: newRow, col: newCol }); break; }
+                newRow += dr; newCol += dc;
+            }
+        });
+        return moves;
+    }
+    getKnightMoves(row, col, color) {
+        const moves = [];
+        const offsets = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+        offsets.forEach(([dr, dc]) => {
+            const newRow = row + dr, newCol = col + dc;
+            if (!this.isInside(newRow, newCol)) return;
+            const target = this.getPiece(newRow, newCol);
+            if (!target || this.getPieceColor(target) !== color) moves.push({ row: newRow, col: newCol });
+        });
+        return moves;
+    }
+    getPawnMoves(row, col, color) {
+        const moves = [];
+        const direction = color === 'white' ? -1 : 1;
+        const startRow = color === 'white' ? 6 : 1;
+        const nextRow = row + direction;
+        if (this.isInside(nextRow, col) && !this.getPiece(nextRow, col)) {
+            moves.push({ row: nextRow, col: col });
+            const doubleRow = row + direction * 2;
+            if (row === startRow && !this.getPiece(doubleRow, col)) moves.push({ row: doubleRow, col: col });
+        }
+        [-1,1].forEach(dc => {
+            const newRow = row + direction, newCol = col + dc;
+            if (!this.isInside(newRow, newCol)) return;
+            const target = this.getPiece(newRow, newCol);
+            if (target && this.getPieceColor(target) !== color) moves.push({ row: newRow, col: newCol });
+            if (this.enPassantTarget && this.enPassantTarget.row === newRow && this.enPassantTarget.col === newCol) moves.push({ row: newRow, col: newCol, enPassant: true });
+        });
+        return moves;
+    }
+    isSquareAttacked(row, col, byColor) {
+        const pawnRow = byColor === 'white' ? row + 1 : row - 1;
+        for (const dc of [-1,1]) {
+            const pawnCol = col + dc;
+            if (!this.isInside(pawnRow, pawnCol)) continue;
+            if (this.getPiece(pawnRow, pawnCol) === (byColor === 'white' ? '♙' : '♟')) return true;
+        }
+        const knight = byColor === 'white' ? '♘' : '♞';
+        for (const [dr, dc] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]) {
+            const r = row + dr, c = col + dc;
+            if (this.isInside(r, c) && this.getPiece(r, c) === knight) return true;
+        }
+        const king = byColor === 'white' ? '♔' : '♚';
+        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+            if (dr === 0 && dc === 0) continue;
+            const r = row + dr, c = col + dc;
+            if (this.isInside(r, c) && this.getPiece(r, c) === king) return true;
+        }
+        const rook = byColor === 'white' ? '♖' : '♜', queen = byColor === 'white' ? '♕' : '♛';
+        for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+            let r = row + dr, c = col + dc;
+            while (this.isInside(r, c)) { const p = this.getPiece(r, c); if (p) { if (p === rook || p === queen) return true; break; } r += dr; c += dc; }
+        }
+        const bishop = byColor === 'white' ? '♗' : '♝';
+        for (const [dr, dc] of [[-1,-1],[-1,1],[1,-1],[1,1]]) {
+            let r = row + dr, c = col + dc;
+            while (this.isInside(r, c)) { const p = this.getPiece(r, c); if (p) { if (p === bishop || p === queen) return true; break; } r += dr; c += dc; }
+        }
+        return false;
+    }
+    findKing(color) {
+        const king = color === 'white' ? '♔' : '♚';
+        for (let row = 0; row < 8; row++) for (let col = 0; col < 8; col++) if (this.getPiece(row, col) === king) return { row, col };
+        return null;
+    }
+    isKingInCheck(color) { const k = this.findKing(color); if (!k) return true; return this.isSquareAttacked(k.row, k.col, this.getOpponentColor(color)); }
+    wouldLeaveKingInCheck(fromRow, fromCol, toRow, toCol) {
+        const snapshot = this.createSnapshot();
+        this.applyTemporaryMove(fromRow, fromCol, toRow, toCol);
+        const movingColor = snapshot.currentPlayer === this.whitePlayerId ? 'white' : 'black';
+        const result = this.isKingInCheck(movingColor);
+        this.restoreSnapshot(snapshot);
+        return result;
+    }
+    createSnapshot() {
+        return { board: this.board.map(r => [...r]), castlingRights: JSON.parse(JSON.stringify(this.castlingRights)), enPassantTarget: this.enPassantTarget ? { ...this.enPassantTarget } : null, currentPlayer: this.currentPlayer };
+    }
+    restoreSnapshot(s) { this.board = s.board.map(r => [...r]); this.castlingRights = JSON.parse(JSON.stringify(s.castlingRights)); this.enPassantTarget = s.enPassantTarget ? { ...s.enPassantTarget } : null; }
+    applyTemporaryMove(fromRow, fromCol, toRow, toCol) {
+        const piece = this.getPiece(fromRow, fromCol);
+        if (!piece) return;
+        if ((piece === '♙' || piece === '♟') && this.enPassantTarget && toRow === this.enPassantTarget.row && toCol === this.enPassantTarget.col && !this.getPiece(toRow, toCol)) {
+            const capturedPawnRow = piece === '♙' ? toRow + 1 : toRow - 1;
+            this.board[capturedPawnRow][toCol] = null;
+        }
+        this.board[toRow][toCol] = this.board[fromRow][fromCol];
+        this.board[fromRow][fromCol] = null;
+        if (piece === '♔' && fromRow === 7 && fromCol === 4) {
+            if (toCol === 6) { this.board[7][5] = this.board[7][7]; this.board[7][7] = null; }
+            if (toCol === 2) { this.board[7][3] = this.board[7][0]; this.board[7][0] = null; }
+        }
+        if (piece === '♚' && fromRow === 0 && fromCol === 4) {
+            if (toCol === 6) { this.board[0][5] = this.board[0][7]; this.board[0][7] = null; }
+            if (toCol === 2) { this.board[0][3] = this.board[0][0]; this.board[0][0] = null; }
+        }
+    }
+    makeMove(fromRow, fromCol, toRow, toCol) {
+        if (this.gameOver) return false;
+        const legalMoves = this.getLegalMoves(fromRow, fromCol);
+        const selectedMove = legalMoves.find(m => m.row === toRow && m.col === toCol);
+        if (!selectedMove) return false;
+        const piece = this.getPiece(fromRow, fromCol);
+        const color = this.getPieceColor(piece);
+        const capturedPiece = this.getPiece(toRow, toCol);
+        if (selectedMove.enPassant) {
+            const capturedPawnRow = color === 'white' ? toRow + 1 : toRow - 1;
+            this.board[capturedPawnRow][toCol] = null;
+        }
+        this.board[toRow][toCol] = piece;
+        this.board[fromRow][fromCol] = null;
+        if (piece === '♔' && fromRow === 7 && fromCol === 4) {
+            if (toCol === 6) { this.board[7][5] = this.board[7][7]; this.board[7][7] = null; }
+            if (toCol === 2) { this.board[7][3] = this.board[7][0]; this.board[7][0] = null; }
+            this.castlingRights.white.kingSide = false; this.castlingRights.white.queenSide = false;
+        }
+        if (piece === '♚' && fromRow === 0 && fromCol === 4) {
+            if (toCol === 6) { this.board[0][5] = this.board[0][7]; this.board[0][7] = null; }
+            if (toCol === 2) { this.board[0][3] = this.board[0][0]; this.board[0][0] = null; }
+            this.castlingRights.black.kingSide = false; this.castlingRights.black.queenSide = false;
+        }
+        if (piece === '♖') { if (fromRow === 7 && fromCol === 0) this.castlingRights.white.queenSide = false; if (fromRow === 7 && fromCol === 7) this.castlingRights.white.kingSide = false; }
+        if (piece === '♜') { if (fromRow === 0 && fromCol === 0) this.castlingRights.black.queenSide = false; if (fromRow === 0 && fromCol === 7) this.castlingRights.black.kingSide = false; }
+        if (piece === '♔') { this.castlingRights.white.kingSide = false; this.castlingRights.white.queenSide = false; }
+        if (piece === '♚') { this.castlingRights.black.kingSide = false; this.castlingRights.black.queenSide = false; }
+        if (capturedPiece === '♖') { if (toRow === 7 && toCol === 0) this.castlingRights.white.queenSide = false; if (toRow === 7 && toCol === 7) this.castlingRights.white.kingSide = false; }
+        if (capturedPiece === '♜') { if (toRow === 0 && toCol === 0) this.castlingRights.black.queenSide = false; if (toRow === 0 && toCol === 7) this.castlingRights.black.kingSide = false; }
+        let promotedPiece = null;
+        if (piece === '♙' && toRow === 0) { promotedPiece = '♕'; this.board[toRow][toCol] = promotedPiece; }
+        if (piece === '♟' && toRow === 7) { promotedPiece = '♛'; this.board[toRow][toCol] = promotedPiece; }
+        this.enPassantTarget = null;
+        if ((piece === '♙' || piece === '♟') && Math.abs(toRow - fromRow) === 2) this.enPassantTarget = { row: (fromRow + toRow) / 2, col: fromCol };
+        this.moveHistory.push(this.getMoveNotation(fromRow, fromCol, toRow, toCol, piece, capturedPiece, selectedMove, promotedPiece));
+        this.lastMove = { fromRow, fromCol, toRow, toCol };
+        this.currentPlayer = this.currentPlayer === this.whitePlayerId ? this.blackPlayerId : this.whitePlayerId;
+        return true;
+    }
+    getMoveNotation(fromRow, fromCol, toRow, toCol, piece, capturedPiece, move, promotedPiece) {
+        const files = 'abcdefgh', ranks = '87654321';
+        if (piece === '♔' && Math.abs(toCol - fromCol) === 2) return toCol === 6 ? 'O-O' : 'O-O-O';
+        let notation = piece + files[fromCol] + ranks[fromRow];
+        notation += (capturedPiece || move.enPassant) ? 'x' : '-';
+        notation += files[toCol] + ranks[toRow];
+        if (promotedPiece) notation += '=' + promotedPiece;
+        return notation;
+    }
+    isCheckmate() { const color = this.currentPlayer === this.whitePlayerId ? 'white' : 'black'; return this.isKingInCheck(color) && this.getAllLegalMoves(color).length === 0; }
+    isStalemate() { const color = this.currentPlayer === this.whitePlayerId ? 'white' : 'black'; return !this.isKingInCheck(color) && this.getAllLegalMoves(color).length === 0; }
+}
+
+/* ============================================================
+   APLICAÇÃO — agora com Supabase
+   ============================================================ */
+class ChessApp {
+    constructor() {
+        this.currentUser = null;
+        this.state = { gameTime: 15 };
+        this.currentMatchup = null;
+        this.currentGame = null;
+        this.board = null;
+        this.selectedSquare = null;
+        this.clockIntervals = {};
+        this.presenceChannel = null;
+        this.liveChannel = null;
+        this.listChannel = null;
+        this._playersCache = [];
+        this.init();
+    }
+
+    async init() {
+        this.setupEventListeners();
+        try {
+            const { data: cfg } = await sb.from('config').select('game_time').eq('id', 1).single();
+            if (cfg) this.state.gameTime = cfg.game_time;
+        } catch (e) { console.error(e); }
+        const saved = sessionStorage.getItem('chessSession');
+        if (saved) {
+            this.currentUser = JSON.parse(saved);
+            this.trackPresence();
+            if (this.currentUser.role === 'admin') this.renderAdminDashboard();
+            else this.renderPlayerDashboard();
+        } else {
+            this.renderLoginScreen();
+        }
+        window.addEventListener('beforeunload', () => this.untrackPresence());
+    }
+
+    setupEventListeners() {
+        document.querySelectorAll('.login-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.login-form').forEach(f => f.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(`${tabName}LoginForm`)?.classList.add('active');
+            });
+        });
+        document.getElementById('playerLoginForm')?.addEventListener('submit', e => { e.preventDefault(); this.playerLogin(document.getElementById('playerUsername').value.trim(), document.getElementById('playerPassword').value); });
+        document.getElementById('adminLoginForm')?.addEventListener('submit', e => { e.preventDefault(); this.adminLogin(document.getElementById('adminUsername').value.trim(), document.getElementById('adminPassword').value); });
+        document.getElementById('playerLogout')?.addEventListener('click', () => this.logout());
+        document.getElementById('adminLogout')?.addEventListener('click', () => this.logout());
+        document.getElementById('addPlayerBtn')?.addEventListener('click', () => this.addPlayer());
+        document.getElementById('playerName')?.addEventListener('keypress', e => { if (e.key === 'Enter') { e.preventDefault(); this.addPlayer(); } });
+        document.getElementById('updateTimeBtn')?.addEventListener('click', () => this.updateGameTime());
+        document.getElementById('randomizeMatchupsBtn')?.addEventListener('click', () => this.randomizeMatchups());
+        document.getElementById('restartTournamentBtn')?.addEventListener('click', () => this.restartTournament());
+        document.getElementById('addAdminBtn')?.addEventListener('click', () => this.addAdmin());
+        document.getElementById('refreshBtn')?.addEventListener('click', () => this.renderPlayerDashboard());
+        document.getElementById('drawOfferBtn')?.addEventListener('click', () => this.offerDraw());
+        document.getElementById('resignBtn')?.addEventListener('click', () => this.resign());
+    }
+
+    /* ---------------- LOGIN ---------------- */
+    async playerLogin(username, password) {
+        const { data } = await sb.rpc('player_login', { u: username, p: password });
+        const player = data && data[0];
+        if (!player) { this.showMessage('playerLogin', 'Credenciais inválidas', 'error'); return; }
+        this.currentUser = { role: 'player', id: player.id, name: player.name, nickname: player.nickname, username: player.username };
+        sessionStorage.setItem('chessSession', JSON.stringify(this.currentUser));
+        this.trackPresence();
+        this.renderPlayerDashboard();
+    }
+    async adminLogin(username, password) {
+        const { data } = await sb.rpc('admin_login', { u: username, p: password });
+        const admin = data && data[0];
+        if (!admin) { this.showMessage('adminLogin', 'Credenciais de admin inválidas', 'error'); return; }
+        this.currentUser = { role: 'admin', id: admin.id, username: admin.username, isSuper: admin.is_super };
+        sessionStorage.setItem('chessSession', JSON.stringify(this.currentUser));
+        this.trackPresence();
+        this.renderAdminDashboard();
+    }
+    logout() {
+        this.stopAllClocks();
+        this.unsubscribeLive();
+        if (this.listChannel) { sb.removeChannel(this.listChannel); this.listChannel = null; }
+        this.untrackPresence();
+        this.currentUser = null; this.currentGame = null; this.currentMatchup = null; this.board = null; this.selectedSquare = null;
+        sessionStorage.removeItem('chessSession');
+        this.renderLoginScreen();
+    }
+    renderLoginScreen() {
+        document.getElementById('loginScreen').style.display = 'flex';
+        document.getElementById('adminDashboard').classList.remove('active');
+        document.getElementById('playerDashboard').classList.remove('active');
+        document.getElementById('playerUsername').value = '';
+        document.getElementById('playerPassword').value = '';
+        document.getElementById('adminUsername').value = '';
+        document.getElementById('adminPassword').value = '';
+    }
+
+    /* ---------------- PRESENÇA (quem está online) ---------------- */
+    trackPresence() {
+        const key = this.currentUser.role + '-' + this.currentUser.id;
+        this.presenceChannel = sb.channel('online-users', { config: { presence: { key } } });
+        this.presenceChannel.on('presence', { event: 'sync' }, () => { if (this.currentUser?.role === 'admin' && this.currentUser.isSuper) this.renderOnlineUsers(); });
+        this.presenceChannel.subscribe(async status => {
+            if (status === 'SUBSCRIBED') {
+                await this.presenceChannel.track({ role: this.currentUser.role, label: this.currentUser.role === 'admin' ? this.currentUser.username : (this.currentUser.name || this.currentUser.username) });
+            }
+        });
+    }
+    untrackPresence() { if (this.presenceChannel) { sb.removeChannel(this.presenceChannel); this.presenceChannel = null; } }
+    renderOnlineUsers() {
+        const el = document.getElementById('onlineList');
+        if (!el || !this.presenceChannel) return;
+        const entries = Object.values(this.presenceChannel.presenceState()).flat();
+        if (entries.length === 0) { el.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:1rem;">Ninguém online.</div>'; return; }
+        el.innerHTML = entries.map(e => `<div class="player-item"><div><span class="online-dot"></span><strong>${this.escapeHtml(e.label)}</strong><div class="player-credentials">${e.role === 'admin' ? 'Administrador' : 'Jogador'}</div></div></div>`).join('');
+    }
+
+    /* ---------------- ADMIN ---------------- */
+    async renderAdminDashboard() {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('playerDashboard').classList.remove('active');
+        document.getElementById('adminDashboard').classList.add('active');
+        document.getElementById('adminNameLabel').textContent = this.currentUser.username + (this.currentUser.isSuper ? ' (principal)' : '');
+        document.getElementById('timePerGame').value = this.state.gameTime;
+        document.getElementById('adminManagementPanel').style.display = this.currentUser.isSuper ? 'block' : 'none';
+        document.getElementById('onlineUsersPanel').style.display = this.currentUser.isSuper ? 'block' : 'none';
+        await this.updatePlayersList();
+        await this.updateMatchupsList();
+        await this.updateRankings();
+        if (this.currentUser.isSuper) { await this.updateAdminsList(); this.renderOnlineUsers(); }
+        this.subscribeAdminRealtime();
+    }
+    subscribeAdminRealtime() {
+        if (this.listChannel) sb.removeChannel(this.listChannel);
+        this.listChannel = sb.channel('admin-live')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'matchups' }, () => { if (this.currentUser?.role === 'admin') { this.updateMatchupsList(); this.updateRankings(); } })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => { if (this.currentUser?.role === 'admin') { this.updatePlayersList(); this.updateRankings(); } })
+            .subscribe();
+    }
+    async addPlayer() {
+        const nameInput = document.getElementById('playerName'), nickInput = document.getElementById('playerNickname');
+        const name = nameInput.value.trim();
+        if (!name) { this.showMessage('adminMessage', 'Digite o nome do jogador.', 'error'); return; }
+        const nickname = nickInput.value.trim() || null;
+        const { count } = await sb.from('players').select('id', { count: 'exact', head: true });
+        const username = `jogador${String((count || 0) + 1).padStart(2, '0')}`;
+        const password = Math.random().toString(36).substring(2, 10);
+        const { error } = await sb.from('players').insert({ name, nickname, username, password });
+        if (error) { this.showMessage('adminMessage', 'Erro: ' + error.message, 'error'); return; }
+        nameInput.value = ''; nickInput.value = '';
+        await this.updatePlayersList(); await this.updateRankings();
+        this.showMessage('adminMessage', `Jogador "${name}" cadastrado!`, 'success');
+    }
+    async removePlayer(id) {
+        if (!confirm('Remover este jogador? Isso também apaga os confrontos dele.')) return;
+        const { error } = await sb.from('players').delete().eq('id', id);
+        if (error) { this.showMessage('adminMessage', 'Erro ao remover: ' + error.message, 'error'); return; }
+        await this.updatePlayersList(); await this.updateMatchupsList(); await this.updateRankings();
+        this.showMessage('adminMessage', 'Jogador removido.', 'success');
+    }
+    async updatePlayersList() {
+        const list = document.getElementById('playersList');
+        if (!list) return;
+        const { data: players } = await sb.from('players').select('*').order('id');
+        this._playersCache = players || [];
+        if (!players || players.length === 0) { list.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:1rem;">Nenhum jogador cadastrado.</div>'; return; }
+        list.innerHTML = players.map(p => `
+            <div class="player-item">
+                <div><strong>${this.escapeHtml(p.name)}</strong>${p.nickname ? ' <span style="color:var(--text-secondary);font-size:0.8rem;">(' + this.escapeHtml(p.nickname) + ')</span>' : ''}
+                <div class="player-credentials">${this.escapeHtml(p.username)} / ${this.escapeHtml(p.password)}</div></div>
+                <button class="btn-danger btn-small" onclick="chessApp.removePlayer(${p.id})">Remover</button>
+            </div>`).join('');
+    }
+    async updateGameTime() {
+        const time = parseInt(document.getElementById('timePerGame').value, 10);
+        if (Number.isNaN(time) || time < 1 || time > 120) { this.showMessage('adminMessage', 'Tempo deve estar entre 1 e 120 minutos.', 'error'); return; }
+        await sb.from('config').update({ game_time: time }).eq('id', 1);
+        this.state.gameTime = time;
+        this.showMessage('adminMessage', `Tempo atualizado para ${time} minutos.`, 'success');
+    }
+    async randomizeMatchups() {
+        const { data: players } = await sb.from('players').select('*').order('id');
+        if (!players || players.length < 2) { this.showMessage('adminMessage', 'Cadastre pelo menos 2 jogadores.', 'error'); return; }
+        const { data: existing } = await sb.from('matchups').select('id');
+        if (existing && existing.length > 0) {
+            if (!confirm('Já existem confrontos. Deseja realizar um novo sorteio? Os confrontos atuais serão substituídos.')) return;
+            await sb.from('matchups').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        }
+        const shuffled = [...players].sort(() => Math.random() - 0.5);
+        for (let i = 0; i < shuffled.length; i += 2) {
+            const p1 = shuffled[i], p2 = shuffled[i + 1];
+            if (!p2) { await sb.from('players').update({ points: p1.points + 1 }).eq('id', p1.id); continue; }
+            const { data: m } = await sb.from('matchups').insert({ player1: p1.id, player2: p2.id }).select().single();
+            const t = this.state.gameTime * 60;
+            await sb.from('games').insert([
+                { matchup_id: m.id, game_index: 0, white_player_id: p1.id, status: 'pending', white_time: t, black_time: t },
+                { matchup_id: m.id, game_index: 1, white_player_id: p2.id, status: 'pending', white_time: t, black_time: t },
+                { matchup_id: m.id, game_index: 2, white_player_id: p1.id, status: 'pending', white_time: t, black_time: t }
+            ]);
+        }
+        await this.updateMatchupsList(); await this.updateRankings();
+        this.showMessage('adminMessage', 'Confrontos sorteados com sucesso!', 'success');
+    }
+    async restartTournament() {
+        if (!confirm('Tem certeza que deseja reiniciar o torneio? Todos os resultados serão apagados.')) return;
+        this.stopAllClocks();
+        await sb.from('matchups').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        const { data: players } = await sb.from('players').select('id');
+        for (const p of (players || [])) await sb.from('players').update({ points: 0 }).eq('id', p.id);
+        await this.updateMatchupsList(); await this.updateRankings();
+        this.showMessage('adminMessage', 'Torneio reiniciado!', 'success');
+    }
+    async updateMatchupsList() {
+        const tbody = document.getElementById('matchupsBody');
+        if (!tbody) return;
+        const { data: matchups } = await sb.from('matchups').select('*, games(*)').order('created_at');
+        const players = this._playersCache.length ? this._playersCache : (await sb.from('players').select('*')).data || [];
+        if (!matchups || matchups.length === 0) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-secondary);">Nenhum confronto sorteado.</td></tr>'; return; }
+        tbody.innerHTML = matchups.map(m => {
+            const p1 = players.find(p => p.id === m.player1), p2 = players.find(p => p.id === m.player2);
+            const p1Wins = (m.games || []).filter(g => g.result === `${m.player1}-win`).length;
+            const p2Wins = (m.games || []).filter(g => g.result === `${m.player2}-win`).length;
+            return `<tr><td><strong>${this.escapeHtml(p1?.name || '-')}</strong></td><td><strong>${this.escapeHtml(p2?.name || '-')}</strong></td>
+                <td>${p1Wins} - ${p2Wins}</td>
+                <td><span class="matchup-status ${m.completed ? 'completed' : 'ongoing'}">${m.completed ? 'Concluído' : 'Em andamento'}</span></td></tr>`;
+        }).join('');
+    }
+    async updateRankings() {
+        const tbody = document.getElementById('rankingsBody');
+        if (!tbody) return;
+        const { data: players } = await sb.from('players').select('*').order('points', { ascending: false });
+        this._playersCache = players || [];
+        tbody.innerHTML = (players || []).map((p, i) => `<tr><td><span class="rank">${i + 1}</span></td><td>${this.escapeHtml(p.name)}</td><td><strong>${p.points}</strong></td></tr>`).join('');
+    }
+
+    /* ---------------- GESTÃO DE ADMINS (só admin principal) ---------------- */
+    async updateAdminsList() {
+        const list = document.getElementById('adminsList');
+        if (!list) return;
+        const { data: admins } = await sb.from('admins').select('id,username,is_super').order('created_at');
+        list.innerHTML = (admins || []).map(a => `
+            <div class="player-item">
+                <div><strong>${this.escapeHtml(a.username)}</strong>${a.is_super ? '<span class="badge-super">principal</span>' : ''}</div>
+                ${a.id !== this.currentUser.id ? `<button class="btn-danger btn-small" onclick="chessApp.removeAdmin('${a.id}')">Remover</button>` : ''}
+            </div>`).join('');
+    }
+    async addAdmin() {
+        const uInput = document.getElementById('newAdminUsername'), pInput = document.getElementById('newAdminPassword');
+        const u = uInput.value.trim();
+        let p = pInput.value.trim();
+        if (!u) { this.showMessage('adminMessage', 'Digite o username do novo admin.', 'error'); return; }
+        if (!p) p = Math.random().toString(36).substring(2, 10);
+        const { error } = await sb.from('admins').insert({ username: u, password: p, is_super: false });
+        if (error) { this.showMessage('adminMessage', 'Erro: ' + error.message, 'error'); return; }
+        uInput.value = ''; pInput.value = '';
+        await this.updateAdminsList();
+        this.showMessage('adminMessage', `Admin "${u}" criado com senha: ${p}`, 'success');
+    }
+    async removeAdmin(id) {
+        const { data: admins } = await sb.from('admins').select('id,is_super');
+        const target = (admins || []).find(a => a.id === id);
+        const superCount = (admins || []).filter(a => a.is_super).length;
+        if (target?.is_super && superCount <= 1) { this.showMessage('adminMessage', 'Não é possível remover o único administrador principal.', 'error'); return; }
+        if (!confirm('Remover este administrador?')) return;
+        await sb.from('admins').delete().eq('id', id);
+        await this.updateAdminsList();
+    }
+
+    /* ---------------- JOGADOR ---------------- */
+    async renderPlayerDashboard() {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('adminDashboard').classList.remove('active');
+        document.getElementById('playerDashboard').classList.add('active');
+        document.getElementById('currentPlayerName').textContent = this.currentUser.name;
+        const { data: matchups } = await sb.from('matchups').select('*, games(*)').or(`player1.eq.${this.currentUser.id},player2.eq.${this.currentUser.id}`);
+        const pending = (matchups || []).find(m => !m.completed);
+        if (pending) {
+            await this.loadMatchup(pending);
+            document.getElementById('gameContainer').style.display = 'block';
+            document.getElementById('noMatchDiv').style.display = 'none';
+        } else {
+            this.stopAllClocks(); this.unsubscribeLive();
+            document.getElementById('gameContainer').style.display = 'none';
+            document.getElementById('noMatchDiv').style.display = 'block';
+        }
+        this.subscribePlayerRealtime();
+    }
+    subscribePlayerRealtime() {
+        if (this.listChannel) sb.removeChannel(this.listChannel);
+        this.listChannel = sb.channel('player-live')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'matchups' }, () => { if (this.currentUser?.role === 'player' && !this.board) this.renderPlayerDashboard(); })
+            .subscribe();
+    }
+    async loadMatchup(m) {
+        const isPlayer1 = this.currentUser.id === m.player1;
+        const adversaryId = isPlayer1 ? m.player2 : m.player1;
+        const { data: adversary } = await sb.from('players').select('*').eq('id', adversaryId).single();
+        document.getElementById('adversaryName').textContent = adversary?.name || '-';
+        const games = (m.games || []).slice().sort((a, b) => a.game_index - b.game_index);
+        const myWins = games.filter(g => g.result === `${this.currentUser.id}-win`).length;
+        const advWins = games.filter(g => g.result === `${adversaryId}-win`).length;
+        document.getElementById('matchScore').textContent = `${myWins} - ${advWins}`;
+        document.getElementById('gamesResult').innerHTML = games.map((g, i) => {
+            let chipClass = 'pending';
+            if (g.status === 'completed') { if (g.result === `${this.currentUser.id}-win`) chipClass = 'win'; else if (g.result === `${adversaryId}-win`) chipClass = 'loss'; else chipClass = 'draw'; }
+            return `<div class="game-chip ${chipClass}">${i + 1}</div>`;
+        }).join('');
+        const nextGame = games.find(g => g.status !== 'completed');
+        if (!nextGame) { document.getElementById('currentGameInfo').textContent = 'Confronto concluído!'; this.stopAllClocks(); this.unsubscribeLive(); return; }
+        const gameNumber = games.indexOf(nextGame) + 1;
+        const meIsWhite = nextGame.white_player_id === this.currentUser.id;
+        document.getElementById('currentGameInfo').textContent = `Jogo ${gameNumber} - Você é ${meIsWhite ? 'Branco' : 'Preto'}`;
+        this.currentMatchup = m;
+        this.currentGame = nextGame;
+        const matchupObj = { id: m.id, player1: m.player1, player2: m.player2, games: games.map(g => ({ id: g.id, status: g.status, result: g.result, whitePlayerId: g.white_player_id })) };
+        this.board = new ChessBoard(nextGame.id, this.currentUser.id, matchupObj);
+        this.hydrateBoard(nextGame);
+        this.selectedSquare = null;
+        this.renderChessboard();
+        this.updateMoveHistory();
+        this.subscribeLive(nextGame.id);
+        const whiteName = meIsWhite ? this.currentUser.name : adversary.name;
+        const blackName = meIsWhite ? adversary.name : this.currentUser.name;
+        this.startClocks(whiteName, blackName);
+    }
+    hydrateBoard(gameRow) {
+        if (gameRow.board_state) {
+            const s = gameRow.board_state;
+            this.board.board = s.board; this.board.castlingRights = s.castlingRights; this.board.enPassantTarget = s.enPassantTarget;
+            this.board.lastMove = s.lastMove; this.board.gameOver = s.gameOver; this.board.currentPlayer = s.currentPlayer; this.board.moveHistory = s.moveHistory || [];
+        }
+        this.board.whiteTimeRemaining = gameRow.white_time ?? this.state.gameTime * 60;
+        this.board.blackTimeRemaining = gameRow.black_time ?? this.state.gameTime * 60;
+    }
+    serializeBoard() {
+        return { board: this.board.board, castlingRights: this.board.castlingRights, enPassantTarget: this.board.enPassantTarget, lastMove: this.board.lastMove, gameOver: this.board.gameOver, currentPlayer: this.board.currentPlayer, moveHistory: this.board.moveHistory };
+    }
+    async pushBoardState(extra = {}) {
+        if (!this.currentGame) return;
+        await sb.from('games').update(Object.assign({ board_state: this.serializeBoard(), white_time: this.board.whiteTimeRemaining, black_time: this.board.blackTimeRemaining, updated_at: new Date().toISOString() }, extra)).eq('id', this.currentGame.id);
+    }
+    subscribeLive(gameId) {
+        this.unsubscribeLive();
+        this.liveChannel = sb.channel('game-' + gameId)
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'games', filter: 'id=eq.' + gameId }, payload => {
+                const row = payload.new;
+                if (!this.board || this.currentGame?.id !== row.id || !row.board_state) return;
+                const remote = row.board_state;
+                if (remote.moveHistory.length > this.board.moveHistory.length || (row.status === 'completed' && !this.board.gameOver)) {
+                    Object.assign(this.board, { board: remote.board, castlingRights: remote.castlingRights, enPassantTarget: remote.enPassantTarget, lastMove: remote.lastMove, gameOver: remote.gameOver, currentPlayer: remote.currentPlayer, moveHistory: remote.moveHistory, whiteTimeRemaining: row.white_time, blackTimeRemaining: row.black_time });
+                    this.selectedSquare = null;
+                    this.renderChessboard(); this.updateMoveHistory(); this.updateClockDisplay();
+                    if (row.status === 'completed') {
+                        this.stopAllClocks();
+                        this.showMessage('playerMessage', row.result === 'draw' ? 'Partida terminou em empate.' : (row.result === `${this.currentUser.id}-win` ? 'Você venceu!' : 'Você perdeu.'), 'success');
+                        setTimeout(() => { if (this.currentUser) this.renderPlayerDashboard(); }, 1200);
+                    }
+                }
+            }).subscribe();
+    }
+    unsubscribeLive() { if (this.liveChannel) { sb.removeChannel(this.liveChannel); this.liveChannel = null; } }
+
+    renderChessboard() {
+        const container = document.getElementById('chessboard');
+        if (!container || !this.board) return;
+        container.innerHTML = '';
+        const checkedColor = this.board.currentPlayer === this.board.whitePlayerId ? 'white' : 'black';
+        let kingInCheckSquare = null;
+        if (this.board.isKingInCheck(checkedColor)) kingInCheckSquare = this.board.findKing(checkedColor);
+        for (let row = 0; row < 8; row++) {
+            const rowDiv = document.createElement('div'); rowDiv.className = 'chessboard-row';
+            for (let col = 0; col < 8; col++) {
+                const square = document.createElement('div');
+                const isLight = (row + col) % 2 === 0;
+                square.className = `square ${isLight ? 'light' : 'dark'}`;
+                square.dataset.row = row; square.dataset.col = col;
+                if (this.board.lastMove && ((this.board.lastMove.fromRow === row && this.board.lastMove.fromCol === col) || (this.board.lastMove.toRow === row && this.board.lastMove.toCol === col))) square.classList.add('last-move');
+                if (kingInCheckSquare && kingInCheckSquare.row === row && kingInCheckSquare.col === col) square.classList.add('check');
+                const piece = this.board.getPiece(row, col);
+                if (this.selectedSquare && this.selectedSquare.row === row && this.selectedSquare.col === col) square.classList.add('selected');
+                if (this.selectedSquare) {
+                    const legalMoves = this.board.getLegalMoves(this.selectedSquare.row, this.selectedSquare.col);
+                    const move = legalMoves.find(item => item.row === row && item.col === col);
+                    if (move) square.classList.add(piece ? 'legal-capture' : 'legal-move');
+                }
+                if (piece) { const img = document.createElement('img'); img.src = PIECE_IMAGES[piece]; img.alt = piece; img.draggable = false; square.appendChild(img); }
+                square.addEventListener('click', () => this.handleSquareClick(row, col));
+                rowDiv.appendChild(square);
+            }
+            container.appendChild(rowDiv);
+        }
+    }
+    async handleSquareClick(row, col) {
+        if (!this.board || this.board.gameOver) return;
+        if (this.board.currentPlayer !== this.currentUser.id) { this.showMessage('playerMessage', 'Não é o seu turno!', 'warning'); return; }
+        const clickedPiece = this.board.getPiece(row, col);
+        if (this.selectedSquare) {
+            const legalMoves = this.board.getLegalMoves(this.selectedSquare.row, this.selectedSquare.col);
+            const legalMove = legalMoves.find(m => m.row === row && m.col === col);
+            if (legalMove) {
+                const moved = this.board.makeMove(this.selectedSquare.row, this.selectedSquare.col, row, col);
+                if (moved) {
+                    this.selectedSquare = null;
+                    this.renderChessboard(); this.updateMoveHistory();
+                    await this.pushBoardState();
+                    await this.checkGameState();
+                    return;
+                }
+            }
+            if (clickedPiece && this.board.getPieceColor(clickedPiece) === this.board.getPlayerColor(this.currentUser.id)) { this.selectedSquare = { row, col }; this.renderChessboard(); return; }
+            this.selectedSquare = null; this.renderChessboard(); return;
+        }
+        if (clickedPiece) {
+            const pieceColor = this.board.getPieceColor(clickedPiece), playerColor = this.board.getPlayerColor(this.currentUser.id);
+            if (pieceColor === playerColor) { const legalMoves = this.board.getLegalMoves(row, col); if (legalMoves.length > 0) { this.selectedSquare = { row, col }; this.renderChessboard(); } }
+        }
+    }
+    async checkGameState() {
+        if (!this.board) return;
+        if (this.board.isCheckmate()) {
+            const winnerId = this.board.currentPlayer === this.board.whitePlayerId ? this.board.blackPlayerId : this.board.whitePlayerId;
+            await this.finishGame(`${winnerId}-win`, 'Xeque-mate!'); return;
+        }
+        if (this.board.isStalemate()) { await this.finishGame('draw', 'Empate por afogamento.'); return; }
+        const currentColor = this.board.currentPlayer === this.board.whitePlayerId ? 'white' : 'black';
+        if (this.board.isKingInCheck(currentColor)) this.showMessage('playerMessage', 'Xeque!', 'warning');
+    }
+    async finishGame(result, message) {
+        if (!this.currentGame || !this.board) return;
+        if (this.currentGame.status === 'completed') return;
+        this.board.gameOver = true; this.stopAllClocks();
+        await sb.from('games').update({ status: 'completed', result, board_state: this.serializeBoard(), white_time: this.board.whiteTimeRemaining, black_time: this.board.blackTimeRemaining, updated_at: new Date().toISOString() }).eq('id', this.currentGame.id);
+        if (result.endsWith('-win')) {
+            const winnerId = parseInt(result.split('-')[0], 10);
+            const { data: winner } = await sb.from('players').select('points').eq('id', winnerId).single();
+            if (winner) await sb.from('players').update({ points: winner.points + 1 }).eq('id', winnerId);
+        }
+        await this.updateMatchupCompletion(this.currentMatchup.id);
+        this.unsubscribeLive();
+        this.showMessage('playerMessage', message, 'success');
+        setTimeout(() => { if (this.currentUser) this.renderPlayerDashboard(); }, 1000);
+    }
+    async updateMatchupCompletion(matchupId) {
+        const { data: m } = await sb.from('matchups').select('*, games(*)').eq('id', matchupId).single();
+        const p1Wins = (m.games || []).filter(g => g.result === `${m.player1}-win`).length;
+        const p2Wins = (m.games || []).filter(g => g.result === `${m.player2}-win`).length;
+        const completedGames = (m.games || []).filter(g => g.status === 'completed').length;
+        if (p1Wins >= 2 || p2Wins >= 2 || completedGames === 3) await sb.from('matchups').update({ completed: true }).eq('id', matchupId);
+    }
+    async offerDraw() {
+        if (!this.board || !this.currentGame || this.board.gameOver) return;
+        if (!confirm('Oferecer empate ao adversário?')) return;
+        await this.finishGame('draw', 'Partida terminou em empate.');
+    }
+    async resign() {
+        if (!this.board || !this.currentGame || this.board.gameOver) return;
+        if (!confirm('Tem certeza que deseja desistir?')) return;
+        const winnerId = this.currentUser.id === this.board.whitePlayerId ? this.board.blackPlayerId : this.board.whitePlayerId;
+        await this.finishGame(`${winnerId}-win`, 'Você desistiu da partida.');
+    }
+
+    /* ---------------- RELÓGIO ---------------- */
+    startClocks(whiteName, blackName) {
+        this.stopAllClocks();
+        document.getElementById('clocksContainer').innerHTML = `
+            <div class="clock" id="clock-white"><div class="clock-player">Branco: ${this.escapeHtml(whiteName)}</div><div class="clock-time" id="time-white">${this.formatTime(this.board.whiteTimeRemaining)}</div></div>
+            <div class="clock" id="clock-black"><div class="clock-player">Preto: ${this.escapeHtml(blackName)}</div><div class="clock-time" id="time-black">${this.formatTime(this.board.blackTimeRemaining)}</div></div>`;
+        document.getElementById('boardClocks').innerHTML = `
+            <div class="clock" id="board-clock-white"><div class="clock-player">Branco</div><div class="clock-time" id="board-time-white">${this.formatTime(this.board.whiteTimeRemaining)}</div></div>
+            <div class="clock" id="board-clock-black"><div class="clock-player">Preto</div><div class="clock-time" id="board-time-black">${this.formatTime(this.board.blackTimeRemaining)}</div></div>`;
+        this.updateClockDisplay();
+        let tick = 0;
+        this.clockIntervals.main = setInterval(async () => {
+            if (!this.board || !this.currentGame || this.board.gameOver) { this.stopAllClocks(); return; }
+            if (this.board.currentPlayer === this.board.whitePlayerId) { this.board.whiteTimeRemaining = Math.max(0, this.board.whiteTimeRemaining - 1); if (this.board.whiteTimeRemaining <= 0) { await this.handleTimeout('white'); return; } }
+            else { this.board.blackTimeRemaining = Math.max(0, this.board.blackTimeRemaining - 1); if (this.board.blackTimeRemaining <= 0) { await this.handleTimeout('black'); return; } }
+            this.updateClockDisplay();
+            tick++; if (tick % 5 === 0) this.pushBoardState();
+        }, 1000);
+    }
+    async handleTimeout(color) {
+        if (!this.board) return;
+        const winnerId = color === 'white' ? this.board.blackPlayerId : this.board.whitePlayerId;
+        await this.finishGame(`${winnerId}-win`, 'Tempo esgotado!');
+    }
+    updateClockDisplay() {
+        if (!this.board) return;
+        const whiteTime = this.formatTime(this.board.whiteTimeRemaining), blackTime = this.formatTime(this.board.blackTimeRemaining);
+        ['time-white', 'board-time-white'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = whiteTime; });
+        ['time-black', 'board-time-black'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = blackTime; });
+        const whiteActive = this.board.currentPlayer === this.board.whitePlayerId;
+        ['clock-white', 'board-clock-white'].forEach(id => document.getElementById(id)?.classList.toggle('active', whiteActive));
+        ['clock-black', 'board-clock-black'].forEach(id => document.getElementById(id)?.classList.toggle('active', !whiteActive));
+        ['clock-white', 'board-clock-white'].forEach(id => document.getElementById(id)?.classList.toggle('warning', this.board.whiteTimeRemaining < 60));
+        ['clock-black', 'board-clock-black'].forEach(id => document.getElementById(id)?.classList.toggle('warning', this.board.blackTimeRemaining < 60));
+    }
+    stopAllClocks() { Object.values(this.clockIntervals).forEach(i => clearInterval(i)); this.clockIntervals = {}; }
+    formatTime(seconds) {
+        seconds = Math.max(0, Math.floor(seconds || 0));
+        const hours = Math.floor(seconds / 3600), minutes = Math.floor((seconds % 3600) / 60), secs = seconds % 60;
+        if (hours > 0) return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+    updateMoveHistory() {
+        const history = document.getElementById('moveHistory');
+        if (!history || !this.board) return;
+        const moves = this.board.moveHistory;
+        if (moves.length === 0) { history.textContent = 'Nenhum lance ainda'; return; }
+        let html = '';
+        for (let i = 0; i < moves.length; i += 2) {
+            const moveNumber = Math.floor(i / 2) + 1, whiteMove = moves[i] || '', blackMove = moves[i + 1] || '';
+            html += `<div class="move-pair"><div class="move-number">${moveNumber}.</div><div class="move">${this.escapeHtml(whiteMove)}</div>${blackMove ? `<div class="move">${this.escapeHtml(blackMove)}</div>` : '<div></div>'}</div>`;
+        }
+        history.innerHTML = html;
+        history.scrollTop = history.scrollHeight;
+    }
+    showMessage(elementId, text, type) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        el.innerHTML = `<div class="message ${type}">${this.escapeHtml(text)}</div>`;
+        setTimeout(() => { if (el) el.innerHTML = ''; }, 5000);
+    }
+    escapeHtml(value) { return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
+}
+
+let chessApp = null;
+function initializeChessApp() { if (chessApp) return; chessApp = new ChessApp(); }
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initializeChessApp);
+else initializeChessApp();
+</script>
+</body>
+</html>
